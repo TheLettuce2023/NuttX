@@ -697,6 +697,9 @@ void stm32_stdclockconfig(void)
 {
   uint32_t regval;
   volatile int32_t timeout;
+#ifdef CONFIG_STM32H7_HSI48
+  volatile int32_t hsi48_timeout;
+#endif
 
 #ifdef STM32_BOARD_USEHSI
   /* Enable Internal High-Speed Clock (HSI) */
@@ -758,10 +761,17 @@ void stm32_stdclockconfig(void)
   regval |= RCC_CR_HSI48ON;
   putreg32(regval, STM32_RCC_CR);
 
-  /* Wait until the HSI48 is ready */
+  /* Bound this optional oscillator independently of the HSE/HSI result.
+   * Its consumers must reject an unavailable HSI48 clock.
+   */
 
-  while ((getreg32(STM32_RCC_CR) & RCC_CR_HSI48RDY) == 0)
+  for (hsi48_timeout = HSIRDY_TIMEOUT; hsi48_timeout > 0;
+       hsi48_timeout--)
     {
+      if ((getreg32(STM32_RCC_CR) & RCC_CR_HSI48RDY) != 0)
+        {
+          break;
+        }
     }
 #endif
 
