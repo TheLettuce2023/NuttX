@@ -58,11 +58,26 @@
 
 extern void __start(void);
 
+static void start(void) naked_function;
 static void start(void)
 {
-  /* Zero lr to mark the end of backtrace */
+  /* A bootloader may jump here in thread mode with CONTROL.SPSEL set, still
+   * on its own process stack (ChibiOS bootloaders, and NuttX 12 bootloaders
+   * because of arm_initialize_stack()).  Startup would then keep running on
+   * that stack, which the application later reuses.  Select the main stack
+   * and load it from vector zero before anything uses a stack, as a hardware
+   * reset does.  Zero lr to mark the end of backtrace.
+   */
 
-  asm volatile ("mov lr, #0\n\t"
+  asm volatile ("movw r0, #:lower16:_vectors\n\t"
+                "movt r0, #:upper16:_vectors\n\t"
+                "ldr r0, [r0]\n\t"
+                "msr msp, r0\n\t"
+                "mrs r1, control\n\t"
+                "bic r1, r1, #2\n\t"
+                "msr control, r1\n\t"
+                "isb sy\n\t"
+                "mov lr, #0\n\t"
                 "b  __start\n\t");
 }
 
